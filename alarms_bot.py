@@ -151,7 +151,7 @@ if __name__ == '__main__':
     logger.debug('Storage is open now')
     state_storage = utils.get_state_storage()
 
-    bot.polling(none_stop=True, interval=5)
+    bot.polling(none_stop=True)
     while True:
         sleep(60)
         pass
