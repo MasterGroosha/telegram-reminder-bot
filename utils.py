@@ -57,8 +57,10 @@ def init_logger():
 def init_storage():
     global offset_storage
     global time_storage
+    global state_storage
     offset_storage = Shelver('users_offsets')
     time_storage = Shelver('temp_time_storage')
+    state_storage = Shelver('state_storage')
 
 def get_logger():
     return logger
@@ -73,12 +75,14 @@ def get_time_storage():
     return time_storage
 
 
-def is_valid_time(text, offset):
-    return None
+def get_state_storage():
+    global state_storage
+    return state_storage
 
 
 def get_unixtime_now(offset):
-    return int(time()) + int(timedelta(hours=int(offset)).seconds)
+    # Вроде должен быть минус, чтобы правильно учитывать пояса
+    return int(time()) - int(timedelta(hours=int(offset)).seconds)
 
 
 def get_unixtime_from_date(date_string):
@@ -97,6 +101,11 @@ def is_valid_datetime(text, offset):
         raise ParseError('Такой даты не существует')
     return True
 
+
+# Короче, эта функция нужна, чтобы правильно задавать время с учётом часового пояса у юзера
+def change_time_to_local(text):
+    # Stub
+    pass
 
 def parse_time(text, user_timezone):
     global time_regexp
@@ -127,34 +136,31 @@ def parse_time(text, user_timezone):
     if re.match(date_regexp_enchanced, text) is not None:
         txt = re.match(date_regexp_enchanced, text).group()
         if is_valid_datetime(txt, user_timezone):
-#            get_logger().debug('Datetime valid.Returning {0!s}'.format(txt))
+            get_logger().debug('Datetime valid.Returning {0!s}'.format(txt))
             return txt
         else:
-         #   get_logger().debug('Match is not none, but there was error. Returning {0!s}'
-         #                      .format(str(txt).split()[0]))
+            get_logger().debug('Match is not none, but there was error. Returning {0!s}'
+                               .format(str(txt).split()[0]))
             return str(txt).split()[0]
         pass
     else:
-       # get_logger().debug('Something went wrong, Match is none.')
+        get_logger().debug('Something went wrong, Match is none.')
         # Проверяем, что не так:
         if re.match(time_regexp, text) is None:
             raise ParseError('Время отсутствует или указано некорректно')
         else:
-          #  get_logger().debug('Ok, returning only time: {0!s}'
-         #                      .format(re.match(time_regexp, text).group()))
+            get_logger().debug('Ok, returning only time: {0!s}'
+                               .format(re.match(time_regexp, text).group()))
             # Просто вернём только время, пусть юзер самостоятельно исправляет
             return re.match(time_regexp, text).group()
-
 
 
 def parse_timezone(text):
     global timezone_regexp
     match_results = re.match(timezone_regexp, text.lstrip())
-    print(match_results)
     if match_results is None:
         return False
     else:
-        print('Matching: {0!s}'.format(int(match_results.group())))
         return int(match_results.group())
 
 

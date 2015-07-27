@@ -2,98 +2,104 @@
 # -*- coding: utf-8 -*-
 import config, utils, telebot, texts, systemtools
 from time import sleep
-from SQLighter import SQLighter
+import StateMachine
 
-users_that_is_setting_time = []
-users_that_is_setting_timezone = []
-users_that_is_going_to_confirm_time = []
 
 bot = telebot.TeleBot(config.token)
 global offset_storage
 global logger
+global state_storage
+
+
+# A simple wrapper to set state (inside uses my Shelver)
+def set_new_state(chat_id, state_name):
+    state_storage.save(str(chat_id), state_name, force_save=True)
 
 
 @bot.message_handler(commands=['start'])
 def command_help(message):
     logger.debug('User {0!s} started new chat with bot'.format(message.chat.id))
+    # I don't know why to use START state, but why not?
+    set_new_state(message.chat.id, StateMachine.States.STATE_START)
     bot.send_message(message.chat.id, texts.welcome_text)
 
 
+# User is going to set alarm
 @bot.message_handler(commands=['newalarm'])
 def cmd_new_alarm(message):
-    # Подчищаем хвосты с прошлых запросов
-    if message.chat.id in users_that_is_setting_timezone:
-        users_that_is_setting_timezone.remove(message.chat.id)
-    if message.chat.id in users_that_is_setting_time:
-        users_that_is_setting_time.remove(message.chat.id)
+    set_new_state(message.chat.id, StateMachine.States.STATE_NEWALARM)
 
     # Проверка, указывал юзер часовой пояс или нет
     # Если не указывал -> отправляем указывать
     if not offset_storage.exists(str(message.chat.id)):
         logger.debug('User {0!s} is going to set new alarm. It\'s his first appear'.format(message.chat.id))
-        users_that_is_setting_timezone.append(message.chat.id)
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
         bot.send_message(message.chat.id, texts.guide_timezone)
     # Если в системе уже сохранен его часовой пояс - сразу предлагаем установить время заметки
     else:
         logger.debug('User {0!s} is going to set new alarm. He has been here before'.format(message.chat.id))
-        users_that_is_setting_time.append(message.chat.id)
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIME)
         bot.send_message(message.chat.id, texts.guide_time)
 
 
+# Standalone timezone setting. See below for explanation
 @bot.message_handler(commands=['setoffset'])
 def cmd_set_offset(message):
     logger.debug('User {0!s} is going to set offset'.format(message.chat.id))
-    if message.chat.id not in users_that_is_setting_timezone:
-        users_that_is_setting_timezone.append(message.chat.id)
+    set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_SEPARATE)
     bot.send_message(message.chat.id, texts.guide_timezone)
 
 
+# If cancel - reset state
 @bot.message_handler(commands=['cancel'])
 def cmd_cancel(message):
-    # Убираем его отовсюду, откуда можем
-    if message.chat.id in users_that_is_setting_time:
-        users_that_is_setting_time.remove(message.chat.id)
-    if message.chat.id in users_that_is_setting_timezone:
-        users_that_is_setting_timezone.remove(message.chat.id)
-    if message.chat.id in users_that_is_going_to_confirm_time:
-        users_that_is_going_to_confirm_time.remove(message.chat.id)
+    set_new_state(message.chat.id, StateMachine.States.STATE_START)
     logger.debug('User {0!s} cancelled current task'.format(message.chat.id))
     bot.send_message(message.chat.id, 'Хорошо. Давайте начнём всё сначала.')
 
 
-# Если юзер в списке устанавливающий часовой пояс
-@bot.message_handler(func=lambda message: message.chat.id in users_that_is_setting_timezone)
+# User is setting timezone
+'''
+A little explanation: my bot will ask user to set timezone on first usage AND user can set timezone himself
+whenever he wants. This way I'm making 2 TIMEZONE states instead of one: one will show guide how to set
+time and the other one will just confirm updating timezone without other steps
+'''
+@bot.message_handler(func=lambda message: state_storage.get(str(message.chat.id)) in [StateMachine.States.STATE_SETTING_TIMEZONE_SEPARATE, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM])
 def cmd_update_timezone_for_user(message):
     # Пытаемся распознать его сообщение
     timezone = utils.parse_timezone(message.text)
     if timezone is None:
         bot.send_message(message.chat.id,
                          'Не получилось распознать часовой пояс, попробуйте ещё раз')
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
         return None
     else:
         logger.debug('User set timezone: {0!s}'.format(timezone))
         offset_storage.save(key=str(message.chat.id), value=timezone, force_save=True)
-        print(offset_storage.get(str(message.chat.id)))
-        bot.send_message(message.chat.id, 'Часовой пояс сохранён, спасибо!')
-        if message.chat.id in users_that_is_setting_timezone:
-            users_that_is_setting_timezone.remove(message.chat.id)
-        cmd_new_alarm(message)
+        print('Offset = ' + str(offset_storage.get(str(message.chat.id))))
+        if state_storage.get(str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM:
+            bot.send_message(message.chat.id, texts.guide_time)
+            set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIME)
+        if state_storage.get(str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIMEZONE_SEPARATE:
+            bot.send_message(message.chat.id, 'Часовой пояс сохранён, спасибо!')
+            set_new_state(message.chat.id, StateMachine.States.STATE_START)
 
 
-@bot.message_handler(func=lambda message: message.chat.id in users_that_is_setting_time)
-def cmd_update_timezone_for_user(message):
+# User is setting time
+@bot.message_handler(func=lambda message: state_storage.get(
+    str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIME)
+def cmd_set_time(message):
+    print('Begin set time')
     global time
     # Check if timezone already set
     if not offset_storage.exists(str(message.chat.id)):
+        'No offset storage'
         logger.warning('Whoa! It looks like {0!s} hasn\'t set offset yet! What a shame!'.format(
             message.chat.id))
         bot.send_message(message.chat.id,
                          'Вы не установили часовой пояс. Пожалуйста, установите его при помощи команды /setoffset и попробуйте ещё раз')
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
         return None
-    else:
-        # TODO: ЗАЧЕМ?
-        if message.chat.id in users_that_is_setting_timezone:
-            users_that_is_setting_timezone.remove(message.chat.id)
     timezone = offset_storage.get(str(message.chat.id))
     time = None
     global error_msg
@@ -113,29 +119,24 @@ def cmd_update_timezone_for_user(message):
             bot.send_message(message.chat.id, 'Не удалось распознать время, попробуйте ещё раз.')
         else:
             bot.send_message(message.chat.id, error_msg)
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIME)
     else:
-        # Если хоть что-то верно, пусть юзеру выводится сообщение
-        if message.chat.id in users_that_is_setting_time:
-            users_that_is_setting_time.remove(message.chat.id)
         utils.get_time_storage().save(str(message.chat.id), time, force_save=True)
-        users_that_is_going_to_confirm_time.append(message.chat.id)
+        set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TEXT)
         bot.send_message(message.chat.id, texts.reply_is_correct_time.format(time))
         pass
 
 
-# Если юзера удовлетворило время и он пишет заметку
-@bot.message_handler(func=lambda message: message.chat.id in users_that_is_going_to_confirm_time)
+# User is satisfied with time and is going to save new note
+@bot.message_handler(func=lambda message: state_storage.get(
+    str(message.chat.id)) == StateMachine.States.STATE_SETTING_TEXT)
 def cmd_save_text(message):
     if len(message.text) > 1000:
         bot.send_message(message.chat.id, texts.reply_too_long_note)
         return None
     systemtools.set_new_at_job(message.chat.id, utils.get_time_storage().get(str(message.chat.id)), message.text)
-    try:
-        del utils.get_time_storage()[str(message.chat.id)]
-    except:
-        pass
-    # TODO: НАПИСАТЬ ДОБАВЛЕНИЕ ЗАМЕТКИ
-    pass
+    # After setting note, reset to START
+    set_new_state(message.chat.id, StateMachine.States.STATE_START)
 
 if __name__ == '__main__':
     utils.init_logger()
@@ -144,6 +145,7 @@ if __name__ == '__main__':
     utils.init_storage()
     offset_storage = utils.get_offset_storage()
     logger.debug('Storage is open now')
+    state_storage = utils.get_state_storage()
 
     bot.polling(none_stop=True, interval=5)
     while True:
