@@ -69,6 +69,7 @@ def cmd_update_timezone_for_user(message):
     # Пытаемся распознать его сообщение
     timezone = utils.parse_timezone(message.text)
     if timezone is None:
+        # "Could not recognize timezone"
         bot.send_message(message.chat.id,
                          'Не получилось распознать часовой пояс, попробуйте ещё раз')
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
@@ -76,11 +77,11 @@ def cmd_update_timezone_for_user(message):
     else:
         logger.debug('User set timezone: {0!s}'.format(timezone))
         offset_storage.save(key=str(message.chat.id), value=timezone, force_save=True)
-        print('Offset = ' + str(offset_storage.get(str(message.chat.id))))
         if state_storage.get(str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM:
             bot.send_message(message.chat.id, texts.guide_time)
             set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIME)
         if state_storage.get(str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIMEZONE_SEPARATE:
+            # "Timezone saved. Thank you!"
             bot.send_message(message.chat.id, 'Часовой пояс сохранён, спасибо!')
             set_new_state(message.chat.id, StateMachine.States.STATE_START)
 
@@ -92,10 +93,12 @@ def cmd_set_time(message):
     print('Begin set time')
     global time
     # Check if timezone already set
+    # I don't remember this if-clause to fire
     if not offset_storage.exists(str(message.chat.id)):
         'No offset storage'
         logger.warning('Whoa! It looks like {0!s} hasn\'t set offset yet! What a shame!'.format(
             message.chat.id))
+        # "You haven't set timezone. Please, set it with /setoffset and try again"
         bot.send_message(message.chat.id,
                          'Вы не установили часовой пояс. Пожалуйста, установите его при помощи команды /setoffset и попробуйте ещё раз')
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
@@ -116,6 +119,7 @@ def cmd_set_time(message):
         logger.warning(
             'User {0!s} set incorrect time: {1!s}'.format(message.chat.id, message.text))
         if error_msg is None:
+            # "Could not recognize timezone. Please try again"
             bot.send_message(message.chat.id, 'Не удалось распознать время, попробуйте ещё раз.')
         else:
             bot.send_message(message.chat.id, error_msg)
