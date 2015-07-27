@@ -1,15 +1,28 @@
 #!/usr/bin/python3.4
 # -*- coding: utf-8 -*-
-import config, utils, telebot, texts, systemtools
+import sys
 from time import sleep
-import StateMachine
+import signal
 
+import telebot
+import config
+import utils
+import texts
+import systemtools
+import StateMachine
 
 bot = telebot.TeleBot(config.token)
 global offset_storage
 global logger
 global state_storage
 
+
+# Обработчик KeyboardInterrupt
+def signal_handler(signal, frame):
+    logger.info('Signal catched, closing databases')
+    print('Signal catched, closing databases')
+    utils.close_storages()
+    sys.exit(0)
 
 # A simple wrapper to set state (inside uses my Shelver)
 def set_new_state(chat_id, state_name):
@@ -142,6 +155,7 @@ def cmd_save_text(message):
     # After setting note, reset to START
     set_new_state(message.chat.id, StateMachine.States.STATE_START)
 
+
 if __name__ == '__main__':
     utils.init_logger()
     logger = utils.get_logger()
@@ -150,7 +164,7 @@ if __name__ == '__main__':
     offset_storage = utils.get_offset_storage()
     logger.debug('Storage is open now')
     state_storage = utils.get_state_storage()
-
+    signal.signal(signal.SIGINT, signal_handler)
     bot.polling(none_stop=True)
     while True:
         sleep(60)
