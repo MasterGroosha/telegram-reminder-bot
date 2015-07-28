@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+My custom wrapper for shelve module
+"""
 import shelve
 from re import match
 
@@ -27,13 +30,23 @@ class Shelver:
 
     def create_key(self, key):
         """
-        Создает ключ без значения
-        :param key:
+        creates key without value
+        :param key: key name
         """
         self.storage[key] = None
         return True
 
     def save(self, key, value, force_save=False):
+        """
+        Saves value for key.
+        :param key: key name
+        :param value: value to save
+        :param force_save: if False, raise NoKeyError when key doesn't exist
+        if True, creates key and saves value to it
+        :return: True, if value is saved
+        :raise SaveValueError: when fail to save key
+        :raise NoKeyError: if key doesn't exist and force_save == False
+        """
         if not self.exists(key) and force_save is False:
             raise NoKeyError('No such key: {0!s}'.format(key))
         if not self.exists(key) and force_save is True:
@@ -49,11 +62,11 @@ class Shelver:
 
     def get(self, key):
         """
-        Получает значение из хранилища по ключу.
-        В случае, если ключ не существует, бросает исключение NoKeyError
-        :param key:
-        :return: Значение по заданному ключу
-        :raise NoKeyError: Если ключ отсутствует в хранилище
+        Gets value from key.
+        If key doesn't exist, throws NoKeyError
+        :param key: key name
+        :return: value for that key
+        :raise NoKeyError: if key doesn't exist
         """
         if key in self.storage:
             return self.storage[key]
@@ -62,19 +75,19 @@ class Shelver:
 
     def get_with_create(self, key, default):
         """
-        Получает значение из хранилища по ключу.
-        В случае, если ключ не существует, создает, присваивает значение default
-        и возвращает его
-        :param key: ключ, по которому ищем
-        :param default: значение, устанавливаемое ключу, если его не существует
-        :return: значение по ключу
+        Gets value from key.
+        If key doesn't exist, creates one with "default" value and returns it
+        :param key: key name
+        :param default: if key doesn't exist, default value for new key with "key" name
+        :return: value for that key
         """
         try:
             if key in self.storage and not None:
                 value = self.storage[key]
                 return value
             else:
-                self.storage[key] = default
+                self.create_key(key)
+                self.save(key, default)
                 return default
         except Exception as ex:
             raise GetValueError(
@@ -82,12 +95,13 @@ class Shelver:
 
     def append(self, key, value, strict=True):
         """
-        Получает значение по ключу как список и добавляет туда значение
-        :param strict: Если True, то отсутствие ключа приводит к исключению,
-        Если False, то создается новый ключ с данным названием
-        :param key: ключ, по которому ищем
-        :param value: значение, добавляемое в список
-        :return: :raise NoKeyError:
+        Gets list for key and appends "value" to it
+        :param strict: if True, raise NoKeyError, if key doesn't exist
+        if False, create key with "value" value
+        :param key: key name
+        :param value: value to append
+        :return: True if value appended
+        :raise NoKeyError: if key doesn't exist
         """
         if strict and key not in self.storage:
             raise NoKeyError('No such key in offset_storage: ' + str(key))
@@ -99,11 +113,12 @@ class Shelver:
 
     def remove(self, key, value):
         """
-        Получает значение по ключу как список и удаляет оттуда значение value
-        Если такого значения в списке не было, ничего не делаем
-        :param key: ключ, по которому ищем
-        :param value: значение, удаляемое из списка
-        :return: :raise NoKeyError:
+        Gets list for key and removes "value" value from it
+        If there's no such value in list, do nothing
+        :param key: key name
+        :param value: value to remove
+        :return: True, if value is removed
+        :raise NoKeyError: if no such key in storage
         """
         if key in self.storage:
             tmp = list(self.storage[key])
@@ -116,9 +131,9 @@ class Shelver:
 
     def find_all(self, pattern):
         """
-        Находит все ключи по заданному шаблону
-        :param pattern: шаблон (регулярное выражение)
-        :return: массив ключей, подходящих по шаблону
+        Finds all keys mathing desired pattern
+        :param pattern: pattern (regular expression)
+        :return: list of keys matching pattern
         """
         keys = self.storage.keys()
         result = []
@@ -129,9 +144,9 @@ class Shelver:
 
     def find_single(self, pattern):
         """
-        Находит первый попавшийся ключ по заданному шаблону
-        :param pattern: шаблон (регулярное выражение)
-        :return: первое найденное значение по шаблону или ничего
+        Finds first key mathing desired pattern
+        :param pattern: pattern (regular expression)
+        :return: first matching key or None
         """
         keys = self.storage.keys()
         for k in keys:
@@ -141,14 +156,16 @@ class Shelver:
             return None
 
     def exists(self, key):
+        """
+        Checks, if key exists in storage
+        :param key: key name
+        :return: True if key exists; False if doesn't
+        """
         if key in self.storage.keys():
             return True
         else:
             return False
 
+    def close(self):
+        self.storage.close()
 
-if __name__ == '__main__':
-    s = Shelver('testdb')
-    s.create_key('test1')
-    print(s.exists('test1'))
-    print(s.exists('test2'))

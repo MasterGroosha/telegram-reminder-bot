@@ -1,17 +1,25 @@
 # -*- coding: utf-8 -*-
 
+from lang import *  # Do not delete this line!
 token = 'TOKEN'
 
-log_name = 'alarms_bot'
-log_level = 'debug'
+log_name = 'alarms_bot'  # Log file name
+log_level = 'debug'  # debug, info, warning, error
 
-# Values for "in the morning", "at noon" (twice because of russian E/Ё letters),
-# "in the evening", "at night"
-values_lexical = ['утром', 'днём', 'днем', 'вечером', 'ночью']
 
-# Server's offset from UTC
-# А надо ли?
-server_offset = 3
+# I don't know why I need this
+server_offset = 0
 
 database_offsets_file = 'users_offsets'
+database_states_file = 'state_storage'
+database_temp_time_storage = 'temp_time_storage'
 database_schedules_file = 'schedules.db'
+
+# Language of bot. Look into "lang" folder for more
+lang = ru
+
+
+# So-called "VIP" users' IDs (can have more than 5 notes at once)
+# Made this to prevent spamming notes
+vip_list = [11111,22222,33333]
+

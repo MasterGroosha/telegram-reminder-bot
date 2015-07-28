@@ -4,21 +4,17 @@ import config
 import re
 from time import mktime, time
 from shelver import Shelver
-from datetime import datetime, timedelta
+from datetime import datetime
+from SQLighter import SQLighter
 
 DATE_01_01_2017 = 1483218000
-
-TEST_REGEXP_TIME_OR_DATETIME = re.compile(
-    r'([01]+[0-9]|2[0-3]):[0-5][0-9]( ([0-2][0-9]|3[0-1]).(0[1-9]|1[0-2]).(201[5-6]|1[5-6]))?')
+SECONDS_IN_24_HOURS = 86401
 
 time_regexp = re.compile(r'([01]+[0-9]|2[0-3]):[0-5][0-9]')
-date_regexp = re.compile(
-    r'([0-2][0-9]|3[0-1]).(0[1-9]|1[0-2]).(201[5-6]|1[5-6])')
 # Нужно для проверки всего сообщения!
 date_regexp_enchanced = re.compile(
     r'([01]+[0-9]|2[0-3]):[0-5][0-9] ([0-2][0-9]|3[0-1]).([1-9]|0[1-9]|1[0-2]).(2[0-9][1-9][0-9])')
 timezone_regexp = re.compile(r'^0$|^[+-][0-9]$|^[+-]1[0-6]{1}$', re.MULTILINE)
-time_lexical_regexp = re.compile(r'(утром|дн[её]м|вечером|ночью)')
 
 
 class PastDateError(Exception):
@@ -36,7 +32,7 @@ class ParseError(Exception):
 def init_logger():
     global logger
     logger = logging.getLogger(config.log_name)
-    logging.basicConfig(filename='decoratorbot.py.log',
+    logging.basicConfig(filename=config.log_name + '.log',
                         format='[%(asctime)s] %(filename)s:%(lineno)d %(levelname)s - %(message)s',
                         datefmt='%d.%m.%Y %H:%M:%S')
     if config.log_level:
@@ -54,13 +50,17 @@ def init_logger():
         logger.setLevel(logging.WARNING)
 
 
+# TODO: РАЗОБРАТЬСЯ, КАКОЙ ФАЙЛ ЗА ЧТО ОТВЕЧАЕТ
 def init_storage():
     global offset_storage
     global time_storage
     global state_storage
-    offset_storage = Shelver('users_offsets')
-    time_storage = Shelver('temp_time_storage')
-    state_storage = Shelver('state_storage')
+    global db
+    offset_storage = Shelver(config.database_offsets_file)
+    time_storage = Shelver(config.database_temp_time_storage)
+    state_storage = Shelver(config.database_states_file)
+    db = SQLighter(config.database_schedules_file)
+
 
 def get_logger():
     return logger
@@ -80,82 +80,117 @@ def get_state_storage():
     return state_storage
 
 
-def get_unixtime_now(offset):
-    # Вроде должен быть минус, чтобы правильно учитывать пояса
-    return int(time()) - int(timedelta(hours=int(offset)).seconds)
+def get_database():
+    global db
+    return db
+
+
+def close_storages():
+    get_time_storage().close()
+    get_state_storage().close()
+    get_offset_storage().close()
+    db.close()
 
 
 def get_unixtime_from_date(date_string):
+    """
+    Gets Unixtime from string
+    :param date_string: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
+    :return: Unixtime based on date_string
+    """
     return int(mktime(datetime.strptime(date_string, '%H:%M %d.%m.%Y').timetuple()))
+
+
+def get_user_date(offset):
+    """
+    Gets user's current date (taking into account offset)
+    :param offset: Timezone difference with Moscow (GNT +3)
+    :return:
+    """
+    return datetime.fromtimestamp(int(time()) + (3600 * offset)).strftime('%d.%m.%Y')
+
+def convert_user_time_to_local(text, offset):
+    """
+    Converts user's entered time to server's local time (to set "at" command)
+    :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
+    :param offset: Timezone difference with Moscow (GNT +3)
+    :return:
+    """
+    if offset == 0:
+        return text
+    return datetime.fromtimestamp(get_unixtime_from_date(text) - (3600 * offset)).strftime('%H:%M %d.%m.%Y')
+
+def convert_user_time_to_local_timestamp(text, offset):
+    """
+    Returns server's local unixtime for entered string date
+    :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
+    :param offset: Timezone difference with Moscow (GNT +3)
+    :return:
+    """
+    return get_unixtime_from_date(text) - (3600 * offset)
 
 
 # Text example: 12:26 20.12.2015, +3
 def is_valid_datetime(text, offset):
+    """
+    Checks date validity:
+    1. Date is not in the past
+    2. Not more than 01.01.2017
+    :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
+    :param offset: Timezone difference with Moscow (GNT +3)
+    :return: True
+    :raise ParseError: If entered date is incorrect
+    """
     try:
         entered_time = get_unixtime_from_date(text)
-        if entered_time < get_unixtime_now(offset):
-            raise PastDateError('Нельзя указывать дату в прошлом!')
+        # print(entered_time)
+        if (entered_time - (3600 * offset)) < time():
+            raise PastDateError(config.lang.s_error_date_in_past)
         if entered_time > DATE_01_01_2017:
-            raise ParseError('Нельзя указывать дату позднее 01.01.2017')
+            raise ParseError(config.lang.s_error_after_2017)
+        # if entered_time < (int(time()) - SECONDS_IN_24_HOURS):
+        #     raise ParseError(config.lang.s_error_incorrect_input)
     except ValueError:
-        raise ParseError('Такой даты не существует')
+        raise ParseError(config.lang.s_error_incorrect_date)
+    except OverflowError:
+        raise ParseError(config.lang.s_error_incorrect_input)
     return True
 
 
-# Короче, эта функция нужна, чтобы правильно задавать время с учётом часового пояса у юзера
-def change_time_to_local(text):
-    # Stub
-    pass
-
 def parse_time(text, user_timezone):
+    """
+    Main checking function
+    If user entered time AND date, checks its validity
+    If only time entered, finds out user's date and appends to time
+    :param text: string in HH:MM dd.mm.YYYY or HH:MM format (20:00 29.12.2015 or 20:00)
+    :param user_timezone: user's timezone
+    :return: string in HH:MM dd.mm.YYYY format
+    :raise ParseError: on validation error
+    """
     global time_regexp
-    global potential_result
-    probable_text = re.match(time_lexical_regexp, text.lstrip())
-    if probable_text is not None:
-        probable_text = probable_text.group()
-        if probable_text == 'утром':
-            print('!!!')
-            return '08:00'
-        elif probable_text == 'днем' or probable_text == 'днём':
-            return '14:00'
-        elif probable_text == 'вечером':
-            return '20:00'
-        elif probable_text == 'ночью':
-            return '02:00'
-
-    # TODO: ВНИМАТЕЛЬНО ПРОЧИТАЙ ТО, ЧТО НИЖЕ И РЕАЛИЗУЙ!
-    '''
-    Поясняю, зачем эта хуйня нужна:
-    Короче, может так случиться, что юзер задавал дату и время, а по регулярке
-    подходит только время. Это не круто и надо как-то учесть.
-    Плюс надо как-то выводить сообщение, поясняющее, что случилась хуйня
-    '''
-
-    # Проверяем, указана ли вообще какая-нибудь дата
-    # Если нашли Время + Дата
     if re.match(date_regexp_enchanced, text) is not None:
         txt = re.match(date_regexp_enchanced, text).group()
         if is_valid_datetime(txt, user_timezone):
-            get_logger().debug('Datetime valid.Returning {0!s}'.format(txt))
             return txt
         else:
-            get_logger().debug('Match is not none, but there was error. Returning {0!s}'
-                               .format(str(txt).split()[0]))
-            return str(txt).split()[0]
-        pass
+            raise ParseError(config.lang.s_error_incorrect_input)
     else:
-        get_logger().debug('Something went wrong, Match is none.')
-        # Проверяем, что не так:
-        if re.match(time_regexp, text) is None:
-            raise ParseError('Время отсутствует или указано некорректно')
-        else:
-            get_logger().debug('Ok, returning only time: {0!s}'
-                               .format(re.match(time_regexp, text).group()))
-            # Просто вернём только время, пусть юзер самостоятельно исправляет
-            return re.match(time_regexp, text).group()
+        # Если есть хотя бы время
+        if re.match(time_regexp, text) is not None:
+            time_with_date = \
+                str(re.match(time_regexp, text).group()) + ' ' + get_user_date(user_timezone)
+            if is_valid_datetime(time_with_date, user_timezone):
+                return time_with_date
+            else:
+                raise ParseError(config.lang.s_error_incorrect_input)
 
 
 def parse_timezone(text):
+    """
+    Checks entered timezone validity (not more than +/- 16)
+    :param text: (string) timezone (+3, 0, -5 ...)
+    :return: (int) timezone value / False on validation error
+    """
     global timezone_regexp
     match_results = re.match(timezone_regexp, text.lstrip())
     if match_results is None:
@@ -165,7 +200,6 @@ def parse_timezone(text):
 
 
 if __name__ == '__main__':
+    print(parse_time('06:00 29.07.15',0))
     pass
-
-
 

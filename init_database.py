@@ -9,7 +9,8 @@ cursor.execute('DROP TABLE IF EXISTS Schedules')
 cursor.execute('CREATE TABLE Schedules '
                 '(Id INTEGER PRIMARY KEY, '
                 'Chat_id INTEGER, '
-                'Scheduled_time INTEGER)')
+                'Scheduled_time INTEGER,'
+               'Job_id INTEGER)')
 
 try:
     cursor.execute('SELECT * FROM Schedules')
