@@ -207,15 +207,19 @@ def parse_timezone(text):
     global timezone_regexp
     match_results = re.match(timezone_regexp, text.lstrip())
     if match_results is None:
-        return False
+        try:
+            num = int(text.lstrip())
+            if -16 < num < 16:
+                return num
+            else:
+                return None
+        except Exception:
+            get_logger().warning('Could not recognize timezone: {0!s}'.format(text.lstrip()))
+            return False
     else:
         return int(match_results.group())
 
 
 if __name__ == '__main__':
-    print(convert_user_time_to_at_command('20:00 23.03.2015', 0))
-    print(convert_user_time_to_at_command('20:00 23.03.2015', -1))
-    print(convert_user_time_to_at_command('20:00 23.03.2015', 1))
-
-pass
+    pass
 
