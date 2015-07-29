@@ -104,16 +104,16 @@ def get_unixtime_from_date(date_string):
 def get_user_date(offset):
     """
     Gets user's current date (taking into account offset)
-    :param offset: Timezone difference with Moscow (GNT +3)
+    :param offset: Timezone difference with Moscow (GMT +3)
     :return:
     """
-    return datetime.fromtimestamp(int(time()) + (3600 * offset)).strftime('%d.%m.%Y')
+    return datetime.fromtimestamp(int(time()) + (3600 * offset) - (3600 * config.server_offset)).strftime('%d.%m.%Y')
 
 def convert_user_time_to_local(text, offset):
     """
     Converts user's entered time to server's local time (to set "at" command)
     :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
-    :param offset: Timezone difference with Moscow (GNT +3)
+    :param offset: Timezone difference with Moscow (GMT +3)
     :return:
     """
     if offset == 0:
@@ -128,19 +128,20 @@ def convert_user_time_to_at_command(text, offset):
     :param offset:
     :return:
     """
-    if int(offset) == 0:
+    if int(offset) == config.server_offset:
         return text
-    elif int(offset) > 0:
-        return strftime('{0!s} - {1!s} hours'.format(text, offset))
-    elif int(offset) < 0:
-        return strftime('{0!s} + {1!s} hours'.format(text, -offset))
+        #return strftime('{0!s} + {1!s} hours'.format(text, config.server_offset))
+    elif int(offset) > config.server_offset:
+        return strftime('{0!s} - {1!s} hours'.format(text, offset - config.server_offset))
+    elif int(offset) < config.server_offset:
+        return strftime('{0!s} + {1!s} hours'.format(text, -offset + config.server_offset))
 
 
 def convert_user_time_to_local_timestamp(text, offset):
     """
     Returns server's local unixtime for entered string date
     :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
-    :param offset: Timezone difference with Moscow (GNT +3)
+    :param offset: Timezone difference with Moscow (GMT +3)
     :return:
     """
     return get_unixtime_from_date(text) - (3600 * offset)
@@ -153,13 +154,13 @@ def is_valid_datetime(text, offset):
     1. Date is not in the past
     2. Not more than 01.01.2017
     :param text: string in HH:MM dd.mm.YYYY format (20:00 29.12.2015)
-    :param offset: Timezone difference with Moscow (GNT +3)
+    :param offset: Timezone difference with Moscow (GMT +3)
     :return: True
     :raise ParseError: If entered date is incorrect
     """
     try:
         entered_time = get_unixtime_from_date(text)
-        if (entered_time - (3600 * offset)) < time():
+        if (entered_time - (3600 * offset)) < (time() - (3600 * config.server_offset)):
             raise PastDateError(config.lang.s_error_date_in_past)
         if entered_time > DATE_01_01_2017:
             raise ParseError(config.lang.s_error_after_2017)
@@ -215,11 +216,13 @@ def parse_timezone(text):
                 return None
         except Exception:
             get_logger().warning('Could not recognize timezone: {0!s}'.format(text.lstrip()))
-            return False
+            return None
     else:
         return int(match_results.group())
 
 
 if __name__ == '__main__':
+    #print(parse_time('22:32 29.07.2015',3))
+    print(get_user_date(5))
     pass
 

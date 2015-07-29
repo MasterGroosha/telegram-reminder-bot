@@ -25,8 +25,6 @@
 - Configure server offset related to GMT +O
 - any new features I'll think about
 
-Special thanks to [pevdh](https://github.com/pevdh) for help and [eternoir](https://github.com/eternnoir) for his awesome API
-
 # Описание на русском языке
 [Reminder bot](telegram.me/alarms_bot) - бот для Telegram, помогающий отправлять сообщения-напоминалки в указанное время
 

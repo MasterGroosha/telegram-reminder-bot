@@ -7,7 +7,7 @@ log_name = 'alarms_bot'  # Log file name
 log_level = 'debug'  # debug, info, warning, error
 
 
-# I don't know why I need this
+# Server offset from GMT (f.ex Moscow is 3)
 server_offset = 0
 
 database_offsets_file = 'users_offsets'
