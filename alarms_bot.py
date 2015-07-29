@@ -33,9 +33,9 @@ def set_new_state(chat_id, state_name):
 
 
 # If you want bot to respond only to your messages:
-# @bot.message_handler(func=lambda message: message.chat.id != 1111) # your ID here
-# def cmd_closed_mode(message):
-#     bot.send_message(message.chat.id, 'Bot is closed for testing. Go away')
+@bot.message_handler(func=lambda message: config.is_closed is True and message.chat.id != 1111) # your ID here
+def cmd_closed_mode(message):
+    bot.send_message(message.chat.id, 'Bot is closed for testing')
 
 # Start of interaction
 @bot.message_handler(commands=['start'])
@@ -104,7 +104,8 @@ def cmd_update_timezone_for_user(message):
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
         return None
     else:
-        logger.debug('User {1!s} set timezone: {0!s}'.format(timezone, message.from_user.username))
+        logger.debug('User {1!s} set timezone: {0!s}'.format(timezone,
+                                                             message.from_user.username + ' (' + str(message.chat.id) + ')'))
         offset_storage.save(key=str(message.chat.id), value=timezone, force_save=True)
         if state_storage.get(str(message.chat.id)) == StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM:
             bot.send_message(message.chat.id, config.lang.s_common_guide_time)
@@ -125,7 +126,7 @@ def cmd_set_time(message):
     if not offset_storage.exists(str(message.chat.id)):
         'No offset storage'
         logger.warning('Whoa! It looks like {0!s} hasn\'t set offset yet! What a shame!'.format(
-            message.from_user.username))
+            message.from_user.username + ' (' + str(message.chat.id) + ')'))
         bot.send_message(message.chat.id, config.lang.s_error_timezone_not_set)
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIMEZONE_FOR_ALARM)
         return None
@@ -144,7 +145,8 @@ def cmd_set_time(message):
     # If there was an error getting time
     if time is None:
         logger.warning(
-            'User {0!s} set incorrect time: {1!s}'.format(message.from_user.username, message.text))
+            'User {0!s} set incorrect time: {1!s}'.format(
+                message.from_user.username + ' (' + str(message.chat.id) + ')', message.text))
         if error_msg is None:
             # "Could not recognize timezone. Please try again"
             bot.send_message(message.chat.id, config.lang.s_error_time_not_recognized)
@@ -152,7 +154,8 @@ def cmd_set_time(message):
             bot.send_message(message.chat.id, error_msg)
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TIME)
     else:
-        logger.debug('User {0!s} set time: {1!s}'.format(message.from_user.username, time))
+        logger.debug('User {0!s} set time: {1!s}'.format(
+            message.from_user.username + ' (' + str(message.chat.id) + ')', time))
         utils.get_time_storage().save(str(message.chat.id), time, force_save=True)
         set_new_state(message.chat.id, StateMachine.States.STATE_SETTING_TEXT)
         bot.send_message(message.chat.id, config.lang.s_common_is_time_correct.format(time))
@@ -168,7 +171,8 @@ def cmd_save_text(message):
         return None
     global offset_storage
     # Convert user's time to server's local time to set "at" command taking offset into account
-    time_to_set = utils.convert_user_time_to_local(utils.get_time_storage().get(str(message.chat.id)), offset_storage.get(key=str(message.chat.id)))
+    time_to_set = utils.convert_user_time_to_at_command(utils.get_time_storage().get(str(message.chat.id)), offset_storage.get(key=str(message.chat.id)))
+    logger.debug('User {0!s} is going to set time: {1!s}'.format(message.from_user.username + ' (' + str(message.chat.id) + ')', time_to_set))
     # Get Unixtime to set to SQLite DB
     unixtime_to_save_to_db = utils.convert_user_time_to_local_timestamp(utils.get_time_storage().get(str(message.chat.id)), offset_storage.get(str(message.chat.id)))
     # Set "at" command and recieve Job ID from it

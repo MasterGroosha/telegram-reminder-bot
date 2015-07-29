@@ -12,9 +12,11 @@ import logging
 
 logger = logging.getLogger(log_name)
 logging.basicConfig(filename=log_name + '.log',
-                    format='[%(asctime)s] %(filename)s: %(levelname)s - %(message)s',
+                    format='[%(asctime)s] OLD_REMOVER %(levelname)s - %(message)s',
                     datefmt='%d.%m.%Y %H:%M:%S')
 logger.setLevel(logging.INFO)
-number_of_deleted = db.delete_old(int(time())).rowcount
-# db.commit()  # not for now
-logger.info('old_remover executed. Rows deleted: {0!s}'.format(number_of_deleted))
+try:
+    number_of_deleted = db.delete_old(int(time())).rowcount
+    logger.info('Finished processing old rows. Rows deleted: {0!s}'.format(number_of_deleted))
+except Exception as ex:
+    logger.error('Failed to process old rows: {0!s}'.format(str(ex)))

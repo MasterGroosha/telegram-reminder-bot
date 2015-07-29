@@ -2,7 +2,7 @@
 import logging
 import config
 import re
-from time import mktime, time
+from time import mktime, time, strftime
 from shelver import Shelver
 from datetime import datetime
 from SQLighter import SQLighter
@@ -120,6 +120,22 @@ def convert_user_time_to_local(text, offset):
         return text
     return datetime.fromtimestamp(get_unixtime_from_date(text) - (3600 * offset)).strftime('%H:%M %d.%m.%Y')
 
+
+def convert_user_time_to_at_command(text, offset):
+    """
+
+    :param text:
+    :param offset:
+    :return:
+    """
+    if int(offset) == 0:
+        return text
+    elif int(offset) > 0:
+        return strftime('{0!s} - {1!s} hours'.format(text, offset))
+    elif int(offset) < 0:
+        return strftime('{0!s} + {1!s} hours'.format(text, -offset))
+
+
 def convert_user_time_to_local_timestamp(text, offset):
     """
     Returns server's local unixtime for entered string date
@@ -143,13 +159,10 @@ def is_valid_datetime(text, offset):
     """
     try:
         entered_time = get_unixtime_from_date(text)
-        # print(entered_time)
         if (entered_time - (3600 * offset)) < time():
             raise PastDateError(config.lang.s_error_date_in_past)
         if entered_time > DATE_01_01_2017:
             raise ParseError(config.lang.s_error_after_2017)
-        # if entered_time < (int(time()) - SECONDS_IN_24_HOURS):
-        #     raise ParseError(config.lang.s_error_incorrect_input)
     except ValueError:
         raise ParseError(config.lang.s_error_incorrect_date)
     except OverflowError:
@@ -200,6 +213,9 @@ def parse_timezone(text):
 
 
 if __name__ == '__main__':
-    print(parse_time('06:00 29.07.15',0))
-    pass
+    print(convert_user_time_to_at_command('20:00 23.03.2015', 0))
+    print(convert_user_time_to_at_command('20:00 23.03.2015', -1))
+    print(convert_user_time_to_at_command('20:00 23.03.2015', 1))
+
+pass
 

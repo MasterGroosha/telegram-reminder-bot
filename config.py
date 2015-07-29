@@ -23,3 +23,6 @@ lang = ru
 # Made this to prevent spamming notes
 vip_list = [11111,22222,33333]
 
+# Allows to temporarly discard all messages except yours
+# Looks at alarms_bot.py (cmd_closed_mode function)
+is_closed = False
