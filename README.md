@@ -22,7 +22,7 @@
 ## TODO:
 - View/Remove currenly set reminders
 - Add attachments to reminders
-- Configure server offset related to GMT +O
+- ~~Configure server offset related to GMT +O~~
 - any new features I'll think about
 
 # Описание на русском языке
