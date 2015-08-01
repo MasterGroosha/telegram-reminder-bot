@@ -14,7 +14,7 @@ time_regexp = re.compile(r'([01]+[0-9]|2[0-3]):[0-5][0-9]')
 # Нужно для проверки всего сообщения!
 date_regexp_enchanced = re.compile(
     r'([01]+[0-9]|2[0-3]):[0-5][0-9] ([0-2][0-9]|3[0-1]).([1-9]|0[1-9]|1[0-2]).(2[0-9][1-9][0-9])')
-timezone_regexp = re.compile(r'^0$|^[+-][0-9]$|^[+-]1[0-6]{1}$', re.MULTILINE)
+timezone_regexp = re.compile(r'0|[+-][0-9]|[+-]1[0-6]{1}', re.MULTILINE)
 
 
 class PastDateError(Exception):
@@ -182,17 +182,17 @@ def parse_time(text, user_timezone):
     :raise ParseError: on validation error
     """
     global time_regexp
-    if re.match(date_regexp_enchanced, text) is not None:
-        txt = re.match(date_regexp_enchanced, text).group()
+    if re.search(date_regexp_enchanced, text) is not None:
+        txt = re.search(date_regexp_enchanced, text).group()
         if is_valid_datetime(txt, user_timezone):
             return txt
         else:
             raise ParseError(config.lang.s_error_incorrect_input)
     else:
         # Если есть хотя бы время
-        if re.match(time_regexp, text) is not None:
+        if re.search(time_regexp, text) is not None:
             time_with_date = \
-                str(re.match(time_regexp, text).group()) + ' ' + get_user_date(user_timezone)
+                str(re.search(time_regexp, text).group()) + ' ' + get_user_date(user_timezone)
             if is_valid_datetime(time_with_date, user_timezone):
                 return time_with_date
             else:
@@ -206,7 +206,7 @@ def parse_timezone(text):
     :return: (int) timezone value / False on validation error
     """
     global timezone_regexp
-    match_results = re.match(timezone_regexp, text.lstrip())
+    match_results = re.search(timezone_regexp, text.lstrip())
     if match_results is None:
         try:
             num = int(text.lstrip())

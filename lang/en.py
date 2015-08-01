@@ -9,7 +9,7 @@ s_common_welcome_text = (
 
 s_common_guide_timezone = (
     'Enter your timezone like +x or -x (only integers supported)\n'
-    'Warning! Timezone should be set related to Moscow time (GMT+3)\n')
+    'Warning! Timezone should be set related to GMT+0\n')
 
 s_common_guide_time = ('Enter reminder time. For example:\n\n'
                        '1. 20:00 - Send reminder today at 20:00\n'
