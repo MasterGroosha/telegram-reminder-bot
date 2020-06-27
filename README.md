@@ -1,10 +1,11 @@
-Описание на русском языке ниже.
+# This project is abandoned
+Please, use [scheduled messages](https://telegram.org/blog/scheduled-reminders-themes) instead.
 
-# Trivia
-[Reminder bot](http://telegram.me/eng_alarms_bot) allows you to set date, time and text to be sent at that time. 
+# # Trivia
+This bot allows you to set date, time and text to be sent at that time. 
 
 ## Under the hood
-[Reminder bot](http://telegram.me/eng_alarms_bot) uses Linux ["__at__"](http://linux.die.net/man/1/at) command to schedule one-time operations (f.ex. send message to user). This is the main feature of Reminder bot: even if bot itself stops because of exception, all scheduled messages are controlled by Linux and 99,9% will be sent in time.  
+This bot uses Linux ["__at__"](http://linux.die.net/man/1/at) command to schedule one-time operations (f.ex. send message to user). This is the main feature of Reminder bot: even if bot itself stops because of exception, all scheduled messages are controlled by Linux and 99,9% will be sent in time.  
 
 ## Features
 * All scheduled messages are controlled by Linux itself.
@@ -26,7 +27,7 @@
 - any new features I'll think about
 
 # Описание на русском языке
-[Reminder bot](telegram.me/alarms_bot) - бот для Telegram, помогающий отправлять сообщения-напоминалки в указанное время
+Бот для Telegram, помогающий отправлять сообщения-напоминалки в указанное время
 
 ## Что внутри?
 Основная функциональность бота кроется в Linux-команде ["__at__"](http://www.opennet.ru/man.shtml?topic=at). Данная команда идеальна для выполнения одноразовых действий. Собственно, в ней заключается и главная фича бота - даже если он зависнет или "упадёт" с какой-либо ошибкой, все уже запланированные сообщения будут доставлены, т.к. обрабатываются и хранятся самим Linux'ом. База данных в боте используется только для отслеживания количества напоминалок у каждого юзера
